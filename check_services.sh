@@ -1,80 +1,358 @@
-#!/bin/bash
+/*
+===============================================================================
+ Enterprise DevSecOps Platform
+-------------------------------------------------------------------------------
+ Version      : 1.0.0
+ Pipeline     : Enterprise Continuous Integration
+ Platform     : Jenkins LTS (Docker)
+ Application  : Node.js (Express)
+ Author       : Iftekhar Shahil
+-------------------------------------------------------------------------------
 
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+ Pipeline Flow
 
-check_status() {
-    if [ $1 -eq 0 ]; then
-        echo -e "${GREEN}✅ $2${NC}"
-    else
-        echo -e "${RED}❌ $2${NC}"
-        return 1
-    fi
+ GitHub
+    │
+    ▼
+ Checkout
+    │
+    ▼
+ Verify Environment
+    │
+    ▼
+ Install Dependencies
+    │
+    ▼
+ Code Quality (ESLint)
+    │
+    ▼
+ Unit Testing (Jest + Coverage)
+    │
+    ▼
+ Dependency Audit
+    │
+    ▼
+ SonarQube Analysis
+    │
+    ▼
+ Quality Gate
+    │
+    ▼
+ Trivy Filesystem Scan
+    │
+    ▼
+ Archive Reports
+===============================================================================
+*/
+
+pipeline {
+
+    agent any
+
+    /**********************************************************************
+     * PIPELINE OPTIONS
+     **********************************************************************/
+
+    options {
+
+        timestamps()
+
+        ansiColor('xterm')
+
+        disableConcurrentBuilds()
+
+        timeout(time: 30, unit: 'MINUTES')
+
+        buildDiscarder(
+            logRotator(
+                numToKeepStr: '20',
+                artifactNumToKeepStr: '20'
+            )
+        )
+
+    }
+
+    /**********************************************************************
+     * ENVIRONMENT VARIABLES
+     **********************************************************************/
+
+    environment {
+
+        APP_DIR = 'app'
+
+        REPORT_DIR = 'security-reports'
+
+        SONARQUBE_ENV = 'SonarQube'
+
+        TRIVY_CACHE_DIR = '.trivy-cache'
+
+    }
+
+    /**********************************************************************
+     * STAGES
+     **********************************************************************/
+
+    stages {
+
+        stage('Checkout Source') {
+
+            steps {
+
+                echo "Checking out latest source..."
+
+                checkout scm
+
+            }
+
+        }
+
+        stage('Verify Build Environment') {
+
+            steps {
+
+                sh '''
+
+                set -e
+
+                echo "======================================"
+                echo " Verifying Build Environment"
+                echo "======================================"
+
+                node --version
+                npm --version
+                git --version
+                docker --version
+                trivy --version
+
+                '''
+
+            }
+
+        }
+
+        stage('Prepare Workspace') {
+
+            steps {
+
+                sh '''
+
+                mkdir -p ${REPORT_DIR}
+
+                '''
+
+            }
+
+        }
+
+        stage('Install Dependencies') {
+
+            steps {
+
+                dir("${APP_DIR}") {
+
+                    sh '''
+
+                    set -e
+
+                    echo "Installing project dependencies..."
+
+                    npm ci
+
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Static Code Analysis (ESLint)') {
+
+            steps {
+
+                dir("${APP_DIR}") {
+
+                    sh '''
+
+                    set -e
+
+                    npm run lint
+
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('Unit Testing') {
+
+            steps {
+
+                dir("${APP_DIR}") {
+
+                    sh '''
+
+                    set -e
+
+                    npm run test:ci
+
+                    '''
+
+                }
+
+            }
+
+            post {
+
+                always {
+
+                    junit allowEmptyResults: true,
+                          testResults: '**/junit.xml'
+
+                }
+
+            }
+
+        }
+
+        stage('Dependency Audit') {
+
+            steps {
+
+                dir("${APP_DIR}") {
+
+                    sh '''
+
+                    set +e
+
+                    npm audit --audit-level=moderate
+
+                    '''
+
+                }
+
+            }
+
+        }
+
+        stage('SonarQube Analysis') {
+
+            steps {
+
+                dir("${APP_DIR}") {
+
+                    script {
+
+                        def scannerHome = tool 'SonarScanner'
+
+                        withSonarQubeEnv("${SONARQUBE_ENV}") {
+
+                            sh """
+
+                            ${scannerHome}/bin/sonar-scanner \
+                              -Dsonar.projectKey=enterprise-devsecops-platform \
+                              -Dsonar.projectName="Enterprise DevSecOps Platform" \
+                              -Dsonar.projectVersion=${BUILD_NUMBER} \
+                              -Dsonar.sources=. \
+                              -Dsonar.tests=test \
+                              -Dsonar.test.inclusions=test/**/*.test.js \
+                              -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+                            """
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        stage('Quality Gate') {
+
+            steps {
+
+                timeout(time: 5, unit: 'MINUTES') {
+
+                    waitForQualityGate abortPipeline: true
+
+                }
+
+            }
+
+        }
+
+        stage('Trivy Filesystem Scan') {
+
+            steps {
+
+                sh '''
+
+                trivy fs . \
+                  --severity HIGH,CRITICAL \
+                  --format table \
+                  --output security-reports/trivy-report.txt
+
+                '''
+
+            }
+
+        }
+
+        stage('Archive Reports') {
+
+            steps {
+
+                archiveArtifacts artifacts: 'security-reports/**/*',
+                                 fingerprint: true,
+                                 allowEmptyArchive: true
+
+            }
+
+        }
+
+    }
+
+    /**********************************************************************
+     * POST BUILD
+     **********************************************************************/
+
+    post {
+
+        success {
+
+            echo ""
+
+            echo "======================================"
+
+            echo " Enterprise CI Pipeline Successful "
+
+            echo "======================================"
+
+        }
+
+        failure {
+
+            echo ""
+
+            echo "======================================"
+
+            echo " Pipeline Failed "
+
+            echo "======================================"
+
+        }
+
+        always {
+
+            cleanWs()
+
+        }
+
+    }
+
 }
-
-restart_container() {
-    echo -e "${RED}🔄 Restarting container: $1...${NC}"
-    docker restart $1 > /dev/null 2>&1
-    sleep 5
-    docker ps --filter "name=$1" --format "table {{.Names}}\t{{.Status}}"
-}
-
-echo "🔍 Checking DevSecOps Environment..."
-echo "-------------------------------------"
-
-# 1. Check running containers
-echo "🛠 Checking Docker containers..."
-docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}\t{{.Status}}"
-check_status $? "Containers are running"
-
-# 2. Check SonarQube health
-echo "🛠 Checking SonarQube health..."
-SONAR_STATUS=$(curl -s -u $SONAR_ADMIN_TOKEN: http://localhost:9000/api/system/health | grep -o GREEN)
-if [[ "$SONAR_STATUS" == "GREEN" ]]; then
-    echo -e "${GREEN}✅ SonarQube is healthy${NC}"
-else
-    echo -e "${RED}❌ SonarQube not healthy${NC}"
-    restart_container sonarqube
-fi
-
-# 3. Check App endpoint
-echo "🛠 Checking DevSecOps App..."
-APP_RESPONSE=$(curl -s http://localhost:3000)
-if [[ "$APP_RESPONSE" == *"Hello from DevSecOps App"* ]]; then
-    echo -e "${GREEN}✅ App root endpoint working${NC}"
-else
-    echo -e "${RED}❌ App root endpoint failed${NC}"
-    restart_container devsecops-app
-fi
-
-APP_HEALTH=$(curl -s http://localhost:3000/health | grep -o healthy)
-if [[ "$APP_HEALTH" == "healthy" ]]; then
-    echo -e "${GREEN}✅ App health endpoint OK${NC}"
-else
-    echo -e "${RED}❌ App health endpoint failed${NC}"
-    restart_container devsecops-app
-fi
-
-# 4. Check Jenkins UI (port open)
-echo "🛠 Checking Jenkins..."
-curl -s http://localhost:8080 > /dev/null
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Jenkins UI reachable at http://localhost:8080${NC}"
-else
-    echo -e "${RED}❌ Jenkins not responding${NC}"
-    restart_container devsecops-jenkins
-fi
-
-# 5. Check DB connectivity
-echo "🛠 Checking PostgreSQL..."
-docker logs sonar-db 2>&1 | grep "database system is ready to accept connections" > /dev/null
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ PostgreSQL is ready${NC}"
-else
-    echo -e "${RED}❌ PostgreSQL not ready${NC}"
-    restart_container sonar-db
-fi
-
-echo "-------------------------------------"
-echo "✅ Service check complete!"

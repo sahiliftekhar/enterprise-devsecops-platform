@@ -1,93 +1,311 @@
-# secure-cicd-devsecops
+# Secure CI/CD DevSecOps Pipeline
 
+An M.Tech dissertation project demonstrating a production-grade DevSecOps pipeline — integrating security scanning, infrastructure-as-code, and automated deployment across every stage of the software delivery lifecycle.
 
+---
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Architecture Overview
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/sahiliftekhar1/secure-cicd-devsecops.git
-git branch -M main
-git push -uf origin main
+Developer Push
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  CI/CD Pipeline  (Jenkins or GitLab CI)                             │
+│                                                                     │
+│  Build → Unit Tests → SAST → Container Scan → Secrets Scan         │
+│       → Quality Gate → ECR Push → ECS Deploy → DAST                │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │
+                                ▼
+                    ┌───────────────────────┐
+                    │   AWS (ap-south-1)    │
+                    │                       │
+                    │  ECR Repository       │
+                    │  ECS Fargate Cluster  │
+                    │  VPC + Security Groups│
+                    │  CloudWatch Logs      │
+                    └───────────────────────┘
 ```
 
-## Integrate with your tools
+### Security tooling at each stage
 
-- [ ] [Set up project integrations](https://gitlab.com/sahiliftekhar1/secure-cicd-devsecops/-/settings/integrations)
+| Stage | Tool | What it checks |
+|-------|------|----------------|
+| Build | Docker multi-stage | No dev deps in production image |
+| Dependency scan | `npm audit` | Known CVEs in Node.js packages |
+| SAST | SonarQube | Code bugs, security hotspots, smells |
+| Quality Gate | SonarQube API | Enforced — fails build if not OK |
+| Container scan | Trivy | OS and library CVEs in image layers |
+| Secrets scan | TruffleHog | Leaked credentials in git history |
+| DAST | OWASP ZAP | Runtime vulnerabilities in deployed app |
+| Infrastructure | Terraform | Immutable ECR tags, least-privilege IAM |
 
-## Collaborate with your team
+---
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+## Project Structure
 
-## Test and Deploy
+```
+secure-cicd-devsecops/
+├── app/                       # Express.js microservice
+│   ├── index.js               # Application code
+│   ├── test/index.test.js     # Jest test suite
+│   ├── Dockerfile             # Multi-stage, non-root, real HEALTHCHECK
+│   └── package.json           # Dependencies: express, helmet, express-rate-limit
+├── terraform/                 # AWS infrastructure (IaC)
+│   ├── main.tf                # Provider config
+│   ├── vpc.tf                 # VPC, subnets, IGW, route tables
+│   ├── ecs.tf                 # ECS cluster, task definition, service
+│   ├── ecr.tf                 # ECR with IMMUTABLE tags + KMS encryption
+│   ├── iam.tf                 # Least-privilege IAM roles
+│   ├── security.tf            # Security groups (ALB, ECS)
+│   ├── variables.tf           # Input variables
+│   └── outputs.tf             # Outputs (VPC ID, ECR URL, etc.)
+├── jenkins/                   # Jenkins configuration
+│   ├── Dockerfile             # Jenkins LTS + curl healthcheck
+│   └── init.groovy.d/
+│       └── basic-security.groovy  # Admin creds from env vars (not hardcoded)
+├── Jenkinsfile                # Main Jenkins declarative pipeline
+├── .gitlab-ci.yml             # GitLab CI alternative pipeline
+├── docker-compose.yml         # Local dev: app + SonarQube + PostgreSQL
+├── devsecops-policy.json      # Least-privilege AWS IAM policy
+├── sonar-project.properties   # SonarQube project config
+└── SECURITY_AUDIT_REPORT.md   # Documented findings and remediations
+```
 
-Use the built-in continuous integration in GitLab.
+---
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+## Prerequisites
 
-***
+| Tool | Minimum version | Purpose |
+|------|----------------|---------|
+| Docker Desktop | 24+ | Container build and local orchestration |
+| Node.js | 18+ | Run and test the application |
+| AWS CLI | 2+ | Interact with ECR and ECS |
+| Terraform | 1.8+ | Provision AWS infrastructure |
+| Jenkins | LTS | CI/CD orchestration |
 
-# Editing this README
+---
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+## Local Development
 
-## Suggestions for a good README
+### 1. Clone and install
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+```bash
+git clone <repo-url>
+cd secure-cicd-devsecops
+cd app && npm ci
+```
 
-## Name
-Choose a self-explaining name for your project.
+### 2. Set required environment variables
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+```bash
+# Required to protect /toggle-health endpoint (use a strong random value)
+export ADMIN_API_KEY="your-strong-random-key-here"
+export PORT=3000
+```
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### 3. Start the full local stack
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+```bash
+# Starts app (port 3000), SonarQube (port 9000), and PostgreSQL
+docker-compose up -d
+```
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 4. Run tests
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+cd app
+npm test                  # Run tests with coverage
+npm run lint              # Lint check
+npm run audit:check       # Dependency vulnerability check
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### 5. Access services
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| Application | http://localhost:3000 | — |
+| SonarQube | http://localhost:9000 | admin / admin (change on first login) |
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+---
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+## API Reference
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### `GET /`
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Returns a greeting and version information.
 
-## License
-For open source projects, say how it is licensed.
+```json
+{
+  "message": "Hello from DevSecOps App 🚀",
+  "version": "1.0.0",
+  "timestamp": "2026-05-20T10:00:00.000Z"
+}
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+### `GET /health`
+
+Health check endpoint used by ECS, the ALB, and the Docker HEALTHCHECK.
+
+```json
+// 200 OK — healthy
+{ "status": "healthy", "uptime": 123.4, "timestamp": "..." }
+
+// 503 Service Unavailable — unhealthy
+{ "status": "unhealthy", "uptime": 123.4, "timestamp": "..." }
+```
+
+### `POST /toggle-health`  🔒 Protected
+
+Toggles the health state. Requires the `X-API-Key` header.
+
+```bash
+curl -X POST http://localhost:3000/toggle-health \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-admin-api-key" \
+  -d '{"healthy": false}'
+```
+
+```json
+// 200 OK
+{ "updated": false, "timestamp": "..." }
+
+// 401 Unauthorized (missing or wrong key)
+{ "error": "Unauthorized: invalid or missing API key." }
+
+// 400 Bad Request (non-boolean value)
+{ "error": "Request body must contain 'healthy' as a boolean value." }
+```
+
+---
+
+## CI/CD Pipeline (Jenkins)
+
+### Required Jenkins credentials
+
+Go to **Manage Jenkins → Credentials → System → Global credentials**:
+
+| ID | Type | Description |
+|----|------|-------------|
+| `aws-ecr-prod` | AWS credentials | Access key + secret for ECR/ECS/STS |
+| `sonarqube-token` | Secret text | SonarQube user token |
+
+### Required Jenkins tools
+
+Go to **Manage Jenkins → Tools → NodeJS installations**:
+- Name: `Node-18`, version: Node.js 18 LTS
+
+### Pipeline stages
+
+1. **Cleanup** — Remove stale containers from previous runs
+2. **Verify AWS Credentials** — Confirm identity and ECR/ECS access
+3. **Build Docker Image** — Multi-stage build with `build-NNN` tag
+4. **Container Scan (Trivy)** — Fails on CRITICAL CVEs; no `|| echo` bypass
+5. **Start SonarQube** — Launch local SonarQube + PostgreSQL via Docker Compose
+6. **Install Dependencies** — `npm ci` (clean install)
+7. **Dependency Scan** — `npm audit` fails on moderate+ vulnerabilities
+8. **Unit Tests** — Jest with coverage (enforced thresholds)
+9. **SonarQube Analysis** — Static code analysis
+10. **Quality Gate** — Polls SonarQube API; fails build if status ≠ OK
+11. **Push to ECR** — Pushes image with `build-NNN` tag (no bare `latest`)
+12. **Deploy to ECS** — `update-service` + `wait services-stable`
+13. **Health Check** — Verifies ECS running/desired counts; hits ALB `/health`
+14. **DAST (ZAP)** — Baseline scan against deployed service URL
+15. **Secrets Scan** — TruffleHog fails build on verified secret leaks
+16. **Final Verification** — Confirms service state via AWS CLI
+
+---
+
+## AWS Infrastructure (Terraform)
+
+### Setup
+
+```bash
+cd terraform
+
+# Configure remote state backend BEFORE running init (never commit tfstate to git)
+# Add a backend "s3" block to main.tf pointing to your state bucket.
+
+terraform init
+terraform plan \
+  -var="aws_account_id=395069634073" \
+  -var="aws_region=ap-south-1" \
+  -var="ecs_task_execution_role_arn=arn:aws:iam::395069634073:role/ecsTaskExecutionRole" \
+  -var="ecr_repo_url=395069634073.dkr.ecr.ap-south-1.amazonaws.com/devsecops-app" \
+  -var="app_subnet_ids=[\"subnet-xxx\",\"subnet-yyy\"]" \
+  -var="app_security_group_id=sg-xxx"
+
+terraform apply
+```
+
+### Resources provisioned
+
+| Resource | Details |
+|----------|---------|
+| VPC | 10.0.0.0/16, DNS enabled |
+| Public subnets | 2× in ap-south-1a/b (for ALB) |
+| Private subnets | 2× in ap-south-1a/b (for ECS tasks) |
+| ECS Cluster | Container Insights enabled |
+| ECS Task Definition | 256 CPU / 512 MB, read-only root FS, capabilities dropped |
+| ECS Service | Deployment circuit breaker + auto-rollback |
+| ECR Repository | IMMUTABLE tags, KMS encryption, scan on push |
+| CloudWatch Logs | 30-day retention |
+| IAM Roles | Least-privilege (scoped to specific resource ARNs) |
+| Security Groups | ALB (80/443 public) + ECS (3000 from ALB only) |
+
+---
+
+## Security Controls Summary
+
+### Application layer
+- **helmet** — Sets `X-Content-Type-Options`, `X-Frame-Options`, `Content-Security-Policy`, etc.
+- **express-rate-limit** — 100 requests per 15 minutes per IP
+- **API key authentication** — `/toggle-health` requires `X-API-Key` header
+- **Input validation** — Boolean type check on request body
+- **Non-root container user** — UID 1001 (not root)
+- **Read-only root filesystem** — Enforced in ECS task definition
+
+### Infrastructure layer
+- **Immutable ECR tags** — Prevents supply-chain tag-overwrite attacks
+- **ECS deployment circuit breaker** — Auto-rollback on failed deployments
+- **CloudWatch encryption** — Logs encrypted at rest
+- **No direct public IPs** — ECS tasks behind ALB, not directly internet-facing
+- **Least-privilege IAM** — Specific actions and resource ARNs, no wildcards
+
+### Pipeline layer
+- **No silenced failures** — All `|| echo` bypasses removed
+- **Real Quality Gate** — SonarQube API polled; build fails if status ≠ OK
+- **CRITICAL CVE gate** — Trivy `--exit-code 1` on CRITICAL severity
+- **Verified secrets gate** — TruffleHog `--fail` on verified leaks
+- **No hardcoded credentials** — All secrets via Jenkins Credential Store
+- **Build-number image tags** — Never deploy bare `latest`
+- **No Docker socket mounting** — Trivy scans image tarballs (no privilege escalation)
+
+---
+
+## Jenkins Security Setup
+
+Jenkins admin credentials are read from environment variables at container startup — never hardcoded.
+
+```bash
+# Generate a strong random password
+export JENKINS_ADMIN_USER=admin
+export JENKINS_ADMIN_PASSWORD="$(openssl rand -base64 32)"
+
+docker run -d \
+  -p 8080:8080 \
+  -e JENKINS_ADMIN_USER \
+  -e JENKINS_ADMIN_PASSWORD \
+  --name jenkins \
+  your-jenkins-image:latest
+```
+
+---
+
+## Known Limitations (Dissertation Scope)
+
+- **No ALB provisioned** — ECS service uses `assign_public_ip = false` with ALB block commented in `ecs.tf`. Uncomment when your account supports ALB creation.
+- **No NAT Gateway** — Private subnets have no outbound internet access (noted as M-6). A NAT Gateway is needed for private tasks to reach external services.
+- **No remote Terraform state** — Use S3 + DynamoDB locking for all non-local environments. Never commit `.tfstate` files.
+- **Single task instance** — `desired_count = 1`. Increase for production availability.

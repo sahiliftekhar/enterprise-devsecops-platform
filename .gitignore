@@ -1,22 +1,82 @@
-# Terraform
+# =============================================================================
+# Terraform — state files contain sensitive resource metadata
+# =============================================================================
 *.tfstate
 *.tfstate.*
+*.tfstate.backup
 .terraform/
+.terraform.lock.hcl
+terraform/tfplan
+terraform/.terraform/
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
-# Python/Node logs
-*.log
-__pycache__/
+# =============================================================================
+# Node.js
+# =============================================================================
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+*.log
 
+# =============================================================================
+# Test & coverage artifacts
+# =============================================================================
+coverage/
+.nyc_output/
+junit.xml
+*.lcov
+
+# =============================================================================
+# Security scan caches & reports (re-generate in CI as needed)
+# =============================================================================
+trivy-cache/
+.trivycache/
+zap/
+zap-reports/
+sonar/
+.sonar/
+security-reports/
+sonar-report.json
+
+# =============================================================================
+# Secrets & credentials — NEVER commit these
+# =============================================================================
+.env
+.env.local
+.env.*.local
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# =============================================================================
 # Docker
-*.env
+# =============================================================================
+docker-compose.override.yml
 
-# IDE/OS files
+# =============================================================================
+# OS / IDE artefacts
+# =============================================================================
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-trivy-cache/
-dast-scan.bat
-ecs-task-def.json
-terraform/
-secure-cicd-devsecops-enhanced
+# =============================================================================
+# Build outputs
+# =============================================================================
+dist/
+build/
+*.tgz

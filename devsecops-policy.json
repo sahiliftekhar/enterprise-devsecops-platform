@@ -42,26 +42,102 @@
             "Resource": "*"
         },
         {
-            "Sid": "ECSPermissions",
+            "Sid": "ECSReadPermissions",
             "Effect": "Allow",
             "Action": [
-                "ecs:*"
+                "ecs:DescribeClusters",
+                "ecs:DescribeServices",
+                "ecs:DescribeTaskDefinition",
+                "ecs:DescribeTasks",
+                "ecs:ListClusters",
+                "ecs:ListServices",
+                "ecs:ListTaskDefinitions",
+                "ecs:ListTasks"
             ],
             "Resource": "*"
         },
         {
-            "Sid": "ECRPermissions",
+            "Sid": "ECSWritePermissions",
             "Effect": "Allow",
             "Action": [
-                "ecr:*"
+                "ecs:CreateCluster",
+                "ecs:DeleteCluster",
+                "ecs:CreateService",
+                "ecs:UpdateService",
+                "ecs:DeleteService",
+                "ecs:RegisterTaskDefinition",
+                "ecs:DeregisterTaskDefinition",
+                "ecs:RunTask",
+                "ecs:StopTask",
+                "ecs:TagResource",
+                "ecs:UntagResource"
+            ],
+            "Resource": [
+                "arn:aws:ecs:ap-south-1:395069634073:cluster/devsecops-app-cluster",
+                "arn:aws:ecs:ap-south-1:395069634073:service/devsecops-app-cluster/*",
+                "arn:aws:ecs:ap-south-1:395069634073:task-definition/devsecops-app-task:*",
+                "arn:aws:ecs:ap-south-1:395069634073:task/devsecops-app-cluster/*"
+            ]
+        },
+        {
+            "Sid": "ECRAuthPermission",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:GetAuthorizationToken"
             ],
             "Resource": "*"
+        },
+        {
+            "Sid": "ECRRepositoryPermissions",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:BatchGetImage",
+                "ecr:CompleteLayerUpload",
+                "ecr:DescribeImages",
+                "ecr:DescribeRepositories",
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:GetLifecyclePolicy",
+                "ecr:GetRepositoryPolicy",
+                "ecr:InitiateLayerUpload",
+                "ecr:ListImages",
+                "ecr:PutImage",
+                "ecr:PutImageScanningConfiguration",
+                "ecr:PutLifecyclePolicy",
+                "ecr:SetRepositoryPolicy",
+                "ecr:TagResource",
+                "ecr:UploadLayerPart",
+                "ecr:CreateRepository",
+                "ecr:DeleteRepository",
+                "ecr:DeleteRepositoryPolicy"
+            ],
+            "Resource": [
+                "arn:aws:ecr:ap-south-1:395069634073:repository/devsecops-app"
+            ]
         },
         {
             "Sid": "LoadBalancerPermissions",
             "Effect": "Allow",
             "Action": [
-                "elasticloadbalancing:*"
+                "elasticloadbalancing:CreateLoadBalancer",
+                "elasticloadbalancing:DeleteLoadBalancer",
+                "elasticloadbalancing:DescribeLoadBalancers",
+                "elasticloadbalancing:DescribeLoadBalancerAttributes",
+                "elasticloadbalancing:ModifyLoadBalancerAttributes",
+                "elasticloadbalancing:CreateTargetGroup",
+                "elasticloadbalancing:DeleteTargetGroup",
+                "elasticloadbalancing:DescribeTargetGroups",
+                "elasticloadbalancing:ModifyTargetGroup",
+                "elasticloadbalancing:CreateListener",
+                "elasticloadbalancing:DeleteListener",
+                "elasticloadbalancing:DescribeListeners",
+                "elasticloadbalancing:ModifyListener",
+                "elasticloadbalancing:RegisterTargets",
+                "elasticloadbalancing:DeregisterTargets",
+                "elasticloadbalancing:DescribeTargetHealth",
+                "elasticloadbalancing:AddTags",
+                "elasticloadbalancing:RemoveTags",
+                "elasticloadbalancing:DescribeTags"
             ],
             "Resource": "*"
         },
@@ -77,9 +153,13 @@
                 "logs:UntagLogGroup",
                 "logs:ListTagsLogGroup",
                 "logs:CreateLogStream",
-                "logs:PutLogEvents"
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams",
+                "logs:GetLogEvents"
             ],
-            "Resource": "*"
+            "Resource": [
+                "arn:aws:logs:ap-south-1:395069634073:log-group:/ecs/devsecops-app*"
+            ]
         },
         {
             "Sid": "IAMPermissions",
@@ -104,6 +184,14 @@
             "Resource": [
                 "arn:aws:iam::395069634073:role/devsecops-app-*"
             ]
+        },
+        {
+            "Sid": "STSPermissions",
+            "Effect": "Allow",
+            "Action": [
+                "sts:GetCallerIdentity"
+            ],
+            "Resource": "*"
         }
     ]
 }

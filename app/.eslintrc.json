@@ -5,8 +5,17 @@
     "jest": true
   },
   "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 2021
+  },
   "rules": {
-    "no-console": "warn",
-    "semi": ["error", "always"]
-  }
+    "no-console": ["warn", { "allow": ["log", "error", "warn"] }],
+    "semi": ["error", "always"],
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_|next" }],
+    "eqeqeq": ["error", "always"],
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-throw-literal": "error"
+  },
+  "ignorePatterns": ["node_modules/", "coverage/"]
 }

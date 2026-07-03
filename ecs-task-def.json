@@ -1,0 +1,30 @@
+{
+  "family": "devsecops-app-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::863207306654:role/devsecops-app-ecs-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::863207306654:role/devsecops-app-ecs-task-role",
+  "containerDefinitions": [
+    {
+      "name": "devsecops-container",
+      "image": "863207306654.dkr.ecr.ap-south-1.amazonaws.com/devsecops-app:latest",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/devsecops-app",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
