@@ -75,6 +75,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && node --version \
     && npm --version
 
+# -----------------------------
+# Install SonarScanner CLI
+# -----------------------------
+ENV SONAR_SCANNER_VERSION=7.2.0.5079
+
+RUN wget -q https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip \
+    && unzip sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip -d /opt \
+    && ln -s /opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux-x64/bin/sonar-scanner /usr/local/bin/sonar-scanner \
+    && rm sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip
+
 # -------------------------------------------------------------------
 # Validate Installed Tools
 # -------------------------------------------------------------------

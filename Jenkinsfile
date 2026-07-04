@@ -17,14 +17,22 @@ pipeline {
      * Pipeline Options
      **********************************************************************/
     options {
+
         timestamps()
+
         ansiColor('xterm')
+
         disableConcurrentBuilds()
+
         buildDiscarder(logRotator(
-            numToKeepStr: '10',
-            artifactNumToKeepStr: '10'
+        numToKeepStr: '10',
+        artifactNumToKeepStr: '10'
         ))
+
         timeout(time: 30, unit: 'MINUTES')
+
+        skipDefaultCheckout(true)
+
     }
 
     /**********************************************************************
@@ -33,6 +41,10 @@ pipeline {
     environment {
 
         APP_DIR = 'app'
+
+        GIT_BRANCH = 'main'
+
+        GIT_REPOSITORY = 'https://github.com/sahiliftekhar/enterprise-devsecops-platform.git'
 
         SONARQUBE_SERVER = 'SonarQube'
 
@@ -52,7 +64,14 @@ pipeline {
 
                 echo "Checking out latest source..."
 
-                checkout scm
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "*/${env.GIT_BRANCH}"]],
+                    userRemoteConfigs: [[
+                        url: env.GIT_REPOSITORY,
+                        credentialsId: 'github-creds'
+                    ]]
+                ])
             }
         }
 
