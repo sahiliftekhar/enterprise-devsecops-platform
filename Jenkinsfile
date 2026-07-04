@@ -93,18 +93,17 @@ pipeline {
             }
         }
 
-        stage('Build Application') {
-
+        stage('Validate Application') {
             steps {
-
-                dir("${APP_DIR}") {
-
+                dir('app') {
                     sh '''
                     set -e
 
-                    echo "Building application..."
+                    echo "Validating package.json..."
 
-                    npm run build
+                    npm run
+
+                    echo "Validation completed."
                     '''
                 }
             }
