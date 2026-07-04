@@ -48,7 +48,6 @@ pipeline {
 
         SONARQUBE_SERVER = 'SonarQube'
 
-        TRIVY_REPORT = 'security-reports/trivy-fs-report.txt'
 
     }
 
