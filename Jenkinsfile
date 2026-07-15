@@ -48,6 +48,9 @@ pipeline {
 
         SONARQUBE_SERVER = 'SonarQube'
 
+        IMAGE_NAME = 'enterprise-devsecops-platform'
+
+        IMAGE_TAG = "${BUILD_NUMBER}"
 
     }
 
@@ -189,6 +192,41 @@ pipeline {
                   --severity HIGH,CRITICAL \
                   --format table \
                   > security-reports/trivy-fs-report.txt
+                '''
+            }
+        }
+
+        stage('Build Docker Image') {
+
+            steps {
+
+                sh '''
+                echo "Building Docker image..."
+
+                docker build \
+                -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                -t ${IMAGE_NAME}:latest \
+                ./app
+
+                docker images | grep ${IMAGE_NAME}
+                '''
+            }
+        }
+
+        stage('Trivy Image Scan') {
+
+            steps {
+
+                sh '''
+                mkdir -p security-reports
+
+                echo "Scanning Docker image..."
+
+                trivy image \
+                --severity HIGH,CRITICAL \
+                --format table \
+                ${IMAGE_NAME}:${IMAGE_TAG} \
+                > security-reports/trivy-image-report.txt
                 '''
             }
         }
