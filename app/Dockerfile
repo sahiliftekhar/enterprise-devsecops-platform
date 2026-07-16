@@ -27,6 +27,7 @@ LABEL maintainer="Iftekhar Shahil"
 LABEL org.opencontainers.image.title="Enterprise DevSecOps Platform"
 LABEL org.opencontainers.image.description="Secure Node.js Application"
 LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.source="https://github.com/sahiliftekhar/enterprise-devsecops-platform"
 
 # Create a least-privilege non-root user before anything else
 RUN addgroup -g 1001 -S nodejs && \

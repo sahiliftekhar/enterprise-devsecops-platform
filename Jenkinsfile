@@ -48,9 +48,21 @@ pipeline {
 
         SONARQUBE_SERVER = 'SonarQube'
 
+        // Docker
         IMAGE_NAME = 'enterprise-devsecops-platform'
-
         IMAGE_TAG = "${BUILD_NUMBER}"
+
+        // AWS
+        AWS_REGION = 'us-east-1'
+        AWS_ACCOUNT_ID = ''
+        
+        // Amazon ECR Repository
+        ECR_REPOSITORY = 'enterprise-devsecops-platform'
+        ECR_REGISTRY = '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com'
+        ECR_NAME = '${ECR_REGISTRY}/${ECR_REPOSITORY}'
+
+        // Report Directories
+        TRIVY_REPORT_DIR = 'security-reports/trivy-fs-report.txt'
 
     }
 
@@ -227,6 +239,57 @@ pipeline {
                 --format table \
                 ${IMAGE_NAME}:${IMAGE_TAG} \
                 > security-reports/trivy-image-report.txt
+                '''
+            }
+        }
+
+        stage('Login to Amazon ECR') {
+
+            steps {
+
+                echo "Logging in to Amazon ECR..."
+                echo "Using ECR Registry: ${ECR_REGISTRY}"
+
+                withCredentials([
+                    [$class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-ecr-creds']
+                ]) {
+
+                    sh '''
+                        aws ecr get-login-password \
+                            --region ${AWS_REGION} | \
+                        docker login \
+                            --username AWS \
+                            --password-stdin \
+                            ${ECR_REGISTRY}
+                    '''
+                }
+            }
+        }
+
+        stage('Tag Docker Image') {
+
+            steps {
+
+                echo "Tagging Docker image for ECR..."
+
+                sh '''
+                    docker images | grep ${IMAGE_NAME}
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_IMAGE}:${IMAGE_TAG}
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_IMAGE}:latest
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+
+            steps {
+
+                echo "Pushing Docker image to Amazon ECR..."
+
+                sh '''
+                    docker push ${ECR_IMAGE}:${IMAGE_TAG}
+                    docker push ${ECR_IMAGE}:latest
                 '''
             }
         }
