@@ -53,13 +53,13 @@ pipeline {
         IMAGE_TAG = "${BUILD_NUMBER}"
 
         // AWS
-        AWS_REGION = 'us-east-1'
-        AWS_ACCOUNT_ID = ''
+        AWS_REGION = 'ap-south-1'
+        AWS_ACCOUNT_ID = '035722575884'
         
         // Amazon ECR Repository
         ECR_REPOSITORY = 'enterprise-devsecops-platform'
-        ECR_REGISTRY = '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com'
-        ECR_NAME = '${ECR_REGISTRY}/${ECR_REPOSITORY}'
+        ECR_REGISTRY = '035722575884.dkr.ecr.ap-south-1.amazonaws.com'
+        ECR_IMAGE = '035722575884.dkr.ecr.ap-south-1.amazonaws.com/enterprise-devsecops-platform'
 
         // Report Directories
         TRIVY_REPORT_DIR = 'security-reports/trivy-fs-report.txt'
