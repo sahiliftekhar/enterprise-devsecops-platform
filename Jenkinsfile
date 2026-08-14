@@ -274,9 +274,7 @@ pipeline {
                 echo "Tagging Docker image for ECR..."
 
                 sh '''
-                    docker images | grep ${IMAGE_NAME}
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_IMAGE}:${IMAGE_TAG}
-                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_IMAGE}:latest
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${ECR_IMAGE}:build-${BUILD_NUMBER}
                 '''
             }
         }
@@ -288,8 +286,7 @@ pipeline {
                 echo "Pushing Docker image to Amazon ECR..."
 
                 sh '''
-                    docker push ${ECR_IMAGE}:${IMAGE_TAG}
-                    docker push ${ECR_IMAGE}:latest
+                    docker push ${ECR_IMAGE}:build-${BUILD_NUMBER}
                 '''
             }
         }

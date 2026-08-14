@@ -1,6 +1,7 @@
 # ==========================
 # VPC Configuration
 # ==========================
+
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -14,6 +15,7 @@ resource "aws_vpc" "main" {
 # ==========================
 # Internet Gateway
 # ==========================
+
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
@@ -23,10 +25,11 @@ resource "aws_internet_gateway" "main" {
 }
 
 # ==========================
-# Public Subnets (Static AZs)
+# Public Subnets
 # ==========================
+
 resource "aws_subnet" "public" {
-  count = 2 # Create 2 subnets
+  count = 2
 
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.public_subnet_cidrs[count.index]
@@ -39,10 +42,11 @@ resource "aws_subnet" "public" {
 }
 
 # ==========================
-# Private Subnets (Static AZs)
+# Private Subnets
 # ==========================
+
 resource "aws_subnet" "private" {
-  count = 2 # Create 2 subnets
+  count = 2
 
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnet_cidrs[count.index]
@@ -56,6 +60,7 @@ resource "aws_subnet" "private" {
 # ==========================
 # Public Route Table
 # ==========================
+
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
@@ -70,11 +75,78 @@ resource "aws_route_table" "public" {
 }
 
 # ==========================
-# Associate Public Subnets with Route Table
+# Associate Public Subnets
 # ==========================
+
 resource "aws_route_table_association" "public" {
   count = 2
 
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
+}
+
+# ==========================
+# NAT Gateway Elastic IPs
+# One EIP per AZ
+# ==========================
+
+resource "aws_eip" "nat" {
+  count  = 2
+  domain = "vpc"
+
+  tags = {
+    Name = "${var.app_name}-nat-eip-${count.index + 1}"
+  }
+}
+
+# ==========================
+# NAT Gateways
+# One NAT Gateway per AZ
+# ==========================
+
+resource "aws_nat_gateway" "main" {
+  count = 2
+
+  allocation_id = aws_eip.nat[count.index].id
+  subnet_id     = aws_subnet.public[count.index].id
+
+  depends_on = [
+    aws_internet_gateway.main
+  ]
+
+  tags = {
+    Name = "${var.app_name}-nat-${count.index + 1}"
+  }
+}
+
+# ==========================
+# Private Route Tables
+# One per AZ
+# ==========================
+
+resource "aws_route_table" "private" {
+  count = 2
+
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.main[count.index].id
+  }
+
+  tags = {
+    Name = "${var.app_name}-private-rt-${count.index + 1}"
+  }
+}
+
+# ==========================
+# Associate Private Subnets
+# with Private Route Tables
+# ==========================
+
+resource "aws_route_table_association" "private" {
+  count = 2
+
+  subnet_id      = aws_subnet.private[count.index].id
+  route_table_id = aws_route_table.private[count.index].id
 }

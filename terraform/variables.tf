@@ -21,11 +21,6 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "aws_account_id" {
-  description = "AWS account ID (used to build resource ARNs)"
-  type        = string
-}
-
 variable "vpc_cidr" {
   description = "VPC CIDR block"
   type        = string
@@ -68,29 +63,8 @@ variable "memory" {
   default     = "512"
 }
 
-variable "ecs_task_execution_role_arn" {
-  description = "ARN of the IAM role for ECS task execution"
-  type        = string
-}
-
-variable "ecr_repo_url" {
-  description = "ECR image repo url (without tag)."
-  type        = string
-}
-
 variable "aws_region" {
   description = "AWS region"
   type        = string
 }
 
-# Required by the error messages
-variable "app_subnet_ids" {
-  description = "A list of subnet IDs for the ECS service."
-  type        = list(string)
-}
-
-# Required by the error messages
-variable "app_security_group_id" {
-  description = "The security group ID for the ECS tasks."
-  type        = string
-}

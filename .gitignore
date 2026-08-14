@@ -5,7 +5,6 @@
 *.tfstate.*
 *.tfstate.backup
 .terraform/
-.terraform.lock.hcl
 terraform/tfplan
 terraform/.terraform/
 override.tf
@@ -80,3 +79,45 @@ Thumbs.db
 dist/
 build/
 *.tgz
+
+
+
+
+# =============================================================================
+# Terraform
+# =============================================================================
+
+# Terraform working directory
+.terraform/
+terraform/.terraform/
+
+# Terraform state
+*.tfstate
+*.tfstate.*
+terraform/*.tfstate
+terraform/*.tfstate.*
+
+# Terraform plan files
+*.tfplan
+terraform/tfplan
+
+# Terraform crash logs
+crash.log
+
+# Terraform variable files - environment-specific
+terraform.tfvars
+terraform/terraform.tfvars
+terraform/terraform.tfvars.json
+
+# Terraform state backups
+terraform/terraform-state-backup-*.json
+
+# Terraform override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI configuration
+.terraformrc
+terraform.rc

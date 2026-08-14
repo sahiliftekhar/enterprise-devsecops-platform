@@ -1,16 +1,20 @@
-# ==========================
-# Terraform Provider Block
-# ==========================
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-  required_version = ">= 1.5.0"
-}
+#############################################
+# Enterprise DevSecOps Platform
+# Root Terraform Module
+#############################################
 
-provider "aws" {
-  region = "ap-south-1"
-}
+# Root module
+#
+# Infrastructure resources are organized across:
+# - vpc.tf
+# - security.tf
+# - iam.tf
+# - ecr.tf
+# - ecs.tf
+# - outputs.tf
+#
+# Provider configuration:
+#   provider.tf
+#
+# Terraform & Provider versions:
+#   versions.tf

@@ -139,12 +139,12 @@ resource "aws_ecs_task_definition" "devsecops_td" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = var.cpu
   memory                   = var.memory
-  execution_role_arn       = var.ecs_task_execution_role_arn
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 
   container_definitions = jsonencode([
     {
       name      = "${var.app_name}-app"
-      image     = "${var.ecr_repo_url}:${var.image_tag}"
+      image     = "${aws_ecr_repository.app.repository_url}:${var.image_tag}"
       cpu       = tonumber(var.cpu)
       memory    = tonumber(var.memory)
       essential = true
@@ -229,8 +229,8 @@ resource "aws_ecs_service" "devsecops_service" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = var.app_subnet_ids
-    security_groups = [var.app_security_group_id]
+    subnets         = aws_subnet.private[*].id
+    security_groups = [aws_security_group.ecs_tasks.id]
 
     # assign_public_ip = false means tasks get no direct internet-facing IP.
     # Traffic should enter via the ALB (public subnets) only.
