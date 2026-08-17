@@ -4,7 +4,7 @@
 resource "aws_cloudwatch_log_group" "ecs" {
   name = "/ecs/${var.app_name}"
 
-  # 30 days minimum for incident investigation (was 7 — too short for forensics)
+  # 30 days minimum for incident investigation
   retention_in_days = 30
 
   tags = {
@@ -46,89 +46,68 @@ resource "aws_ecs_cluster" "main" {
 
 # =============================================================================
 # Application Load Balancer
-# Uncomment when your AWS account supports ALB creation.
-# ECS tasks should NEVER be directly internet-facing (assign_public_ip = true
-# on ECS service is a HIGH severity finding — H-6). Always use an ALB.
 # =============================================================================
+resource "aws_lb" "main" {
+  name               = "${var.app_name}-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb.id]
+  subnets            = aws_subnet.public[*].id
 
-# resource "aws_lb" "main" {
-#   name               = "${var.app_name}-alb"
-#   internal           = false
-#   load_balancer_type = "application"
-#   security_groups    = [aws_security_group.alb.id]
-#   subnets            = aws_subnet.public[*].id
-#
-#   # Enable deletion protection in production
-#   enable_deletion_protection = var.environment == "production" ? true : false
-#
-#   # Enable access logs for security auditing
-#   access_logs {
-#     bucket  = aws_s3_bucket.alb_logs.bucket
-#     prefix  = "${var.app_name}-alb"
-#     enabled = true
-#   }
-#
-#   tags = {
-#     Name        = "${var.app_name}-alb"
-#     Environment = var.environment
-#     ManagedBy   = "terraform"
-#   }
-# }
+  # Enable deletion protection in production
+  enable_deletion_protection = var.environment == "production"
 
-# resource "aws_lb_target_group" "app" {
-#   name        = "${var.app_name}-tg"
-#   port        = var.container_port
-#   protocol    = "HTTP"
-#   vpc_id      = aws_vpc.main.id
-#   target_type = "ip"
-#
-#   health_check {
-#     enabled             = true
-#     healthy_threshold   = 2
-#     interval            = 30
-#     matcher             = "200"
-#     path                = "/health"
-#     port                = "traffic-port"
-#     protocol            = "HTTP"
-#     timeout             = 5
-#     unhealthy_threshold = 3
-#   }
-#
-#   tags = {
-#     Name        = "${var.app_name}-tg"
-#     Environment = var.environment
-#     ManagedBy   = "terraform"
-#   }
-# }
+  tags = {
+    Name        = "${var.app_name}-alb"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
 
-# resource "aws_lb_listener" "app_http" {
-#   load_balancer_arn = aws_lb.main.arn
-#   port              = "80"
-#   protocol          = "HTTP"
-#
-#   # In production, redirect HTTP → HTTPS instead of forwarding
-#   default_action {
-#     type = "redirect"
-#     redirect {
-#       port        = "443"
-#       protocol    = "HTTPS"
-#       status_code = "HTTP_301"
-#     }
-#   }
-# }
+# =============================================================================
+# ALB Target Group
+# =============================================================================
+resource "aws_lb_target_group" "app" {
+  name        = "${var.app_name}-tg"
+  port        = var.container_port
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "ip"
 
-# resource "aws_lb_listener" "app_https" {
-#   load_balancer_arn = aws_lb.main.arn
-#   port              = "443"
-#   protocol          = "HTTPS"
-#   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"  # TLS 1.3 preferred
-#   certificate_arn   = var.acm_certificate_arn
-#
-#   default_action {
-#     type             = "forward"
-#     target_group_arn = aws_lb_target_group.app.arn
-#   }
-# }
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/health"
+    port                = "traffic-port"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 3
+  }
+
+  tags = {
+    Name        = "${var.app_name}-tg"
+    Environment = var.environment
+    ManagedBy   = "terraform"
+  }
+}
+
+# =============================================================================
+# HTTP Listener
+# =============================================================================
+# HTTP is intentionally used for the initial ALB integration.
+# HTTPS + ACM certificate will be added in the TLS phase.
+resource "aws_lb_listener" "app_http" {
+  load_balancer_arn = aws_lb.main.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app.arn
+  }
+}
 
 # =============================================================================
 # ECS Task Definition
@@ -157,7 +136,8 @@ resource "aws_ecs_task_definition" "devsecops_td" {
         }
       ]
 
-      # Health check mirrors the Docker HEALTHCHECK — uses /health endpoint
+      # ECS container health check
+      # Mirrors the Docker HEALTHCHECK and uses the application's /health endpoint.
       healthCheck = {
         command     = ["CMD-SHELL", "wget -qO- http://localhost:${var.container_port}/health | grep -q '\"status\":\"healthy\"' || exit 1"]
         interval    = 30
@@ -166,9 +146,6 @@ resource "aws_ecs_task_definition" "devsecops_td" {
         startPeriod = 15
       }
 
-      # Inject the API key for /toggle-health via Secrets Manager or SSM.
-      # Never pass secrets as plain environment variables in production;
-      # use the 'secrets' field with valueFrom pointing to SSM/SecretsManager.
       environment = [
         {
           name  = "NODE_ENV"
@@ -180,10 +157,13 @@ resource "aws_ecs_task_definition" "devsecops_td" {
         }
       ]
 
+      # Secrets will be added through SSM Parameter Store / Secrets Manager.
+      # Never pass production secrets as plain environment variables.
+      #
       # secrets = [
       #   {
       #     name      = "ADMIN_API_KEY"
-      #     valueFrom = "arn:aws:ssm:${var.aws_region}:${var.aws_account_id}:parameter/${var.app_name}/admin-api-key"
+      #     valueFrom = "..."
       #   }
       # ]
 
@@ -196,15 +176,16 @@ resource "aws_ecs_task_definition" "devsecops_td" {
         }
       }
 
-      # Read-only root filesystem reduces the blast radius of a container escape
+      # Read-only root filesystem
       readonlyRootFilesystem = true
 
-      # Drop all Linux capabilities and only add the minimum required
+      # Drop Linux capabilities
       linuxParameters = {
         capabilities = {
           drop = ["ALL"]
           add  = []
         }
+
         # Prevent privilege escalation inside the container
         initProcessEnabled = false
       }
@@ -229,18 +210,13 @@ resource "aws_ecs_service" "devsecops_service" {
   launch_type     = "FARGATE"
 
   network_configuration {
-    subnets         = aws_subnet.private[*].id
-    security_groups = [aws_security_group.ecs_tasks.id]
-
-    # assign_public_ip = false means tasks get no direct internet-facing IP.
-    # Traffic should enter via the ALB (public subnets) only.
-    # If you are not yet using an ALB, temporarily set this to true and restrict
-    # ingress to port 3000 in the security group — but enable the ALB ASAP.
+    # ECS tasks remain private and are never directly internet-facing.
+    subnets          = aws_subnet.private[*].id
+    security_groups  = [aws_security_group.ecs_tasks.id]
     assign_public_ip = false
   }
 
-  # Deployment circuit breaker — automatically rolls back failed deployments
-  # instead of leaving the service in a broken state.
+  # Automatically roll back failed deployments.
   deployment_circuit_breaker {
     enable   = true
     rollback = true
@@ -250,14 +226,17 @@ resource "aws_ecs_service" "devsecops_service" {
     type = "ECS"
   }
 
-  # Uncomment the load_balancer block once the ALB is provisioned.
-  # load_balancer {
-  #   target_group_arn = aws_lb_target_group.app.arn
-  #   container_name   = "${var.app_name}-app"
-  #   container_port   = var.container_port
-  # }
+  # Register ECS tasks with the ALB target group.
+  load_balancer {
+    target_group_arn = aws_lb_target_group.app.arn
+    container_name   = "${var.app_name}-app"
+    container_port   = var.container_port
+  }
 
-  depends_on = [aws_ecs_task_definition.devsecops_td]
+  # Ensure the ALB listener exists before ECS registers the service.
+  depends_on = [
+    aws_lb_listener.app_http
+  ]
 
   tags = {
     Name        = "${var.app_name}-service"

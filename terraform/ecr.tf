@@ -1,22 +1,27 @@
 resource "aws_ecr_repository" "app" {
   name = var.app_name
 
-  # IMMUTABLE tags prevent overwriting an existing image tag, closing a common
-  # supply-chain attack vector where an attacker pushes a malicious image under
-  # an already-deployed tag (e.g. "latest"). Every build must use a unique tag
-  # (e.g. the CI build number) and "latest" should never be deployed directly.
+  # Safety guard:
+  # Never allow Terraform to destroy the ECR repository automatically.
+  # This protects existing container images from accidental deletion.
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  # Immutable tags prevent an existing image tag from being overwritten.
+  # CI/CD should therefore use unique build tags such as build-123.
   image_tag_mutability = "IMMUTABLE"
 
   image_scanning_configuration {
-    # Scan every image on push with ECR Basic Scanning (backed by Clair/Trivy).
-    # For enhanced scanning (Inspector v2), enable it at the registry level.
+    # Scan images automatically when they are pushed to ECR.
     scan_on_push = true
   }
 
   encryption_configuration {
-    # KMS encryption (preferred over AES256 for audit-trail and key rotation).
-    # Change to encryption_type = "AES256" if a KMS key is not available.
-    encryption_type = "KMS"
+    # Keep the encryption type aligned with the existing repository.
+    # Changing AES256 -> KMS forces ECR repository replacement.
+    # Existing repository: AES256.
+    encryption_type = "AES256"
   }
 
   tags = {
@@ -34,24 +39,32 @@ resource "aws_ecr_lifecycle_policy" "app" {
       {
         rulePriority = 1
         description  = "Expire untagged images after 1 day"
+
         selection = {
           tagStatus   = "untagged"
           countType   = "sinceImagePushed"
           countUnit   = "days"
           countNumber = 1
         }
-        action = { type = "expire" }
+
+        action = {
+          type = "expire"
+        }
       },
       {
         rulePriority = 2
-        description  = "Keep last 10 tagged images (build-number tags)"
+        description  = "Keep last 10 tagged build images"
+
         selection = {
           tagStatus     = "tagged"
           tagPrefixList = ["build-"]
           countType     = "imageCountMoreThan"
           countNumber   = 10
         }
-        action = { type = "expire" }
+
+        action = {
+          type = "expire"
+        }
       }
     ]
   })
